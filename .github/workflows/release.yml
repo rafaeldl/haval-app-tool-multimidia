@@ -28,23 +28,22 @@ jobs:
 
       - name: Sign APK
         if: secrets.RELEASE_KEYSTORE != ''
-        id: sign_apk
-        uses: r0adkll/sign-android-release@v1
-        with:
-          releaseDirectory: app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.RELEASE_KEYSTORE }}
-          alias: ${{ secrets.RELEASE_KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
-          keyPassword: ${{ secrets.RELEASE_KEY_PASSWORD }}
-        env:
-          BUILD_TOOLS_VERSION: "34.0.0"
+        run: |
+          echo "${{ secrets.RELEASE_KEYSTORE }}" | base64 --decode > release.keystore
+          find "$ANDROID_SDK_ROOT/build-tools" -type f -name "apksigner" | sort -r | head -n 1 | xargs -I {} {} sign \
+            --ks release.keystore \
+            --ks-key-alias "${{ secrets.RELEASE_KEY_ALIAS }}" \
+            --ks-pass pass:"${{ secrets.RELEASE_KEYSTORE_PASSWORD }}" \
+            --key-pass pass:"${{ secrets.RELEASE_KEY_PASSWORD }}" \
+            --out app/build/outputs/apk/release/app-release-signed.apk \
+            app/build/outputs/apk/release/app-release-unsigned.apk
 
       - name: Create Release
         if: secrets.RELEASE_KEYSTORE != ''
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v1.0.${{ github.run_number }}
-          files: ${{steps.sign_apk.outputs.signedReleaseFile}}
+          files: app/build/outputs/apk/release/app-release-signed.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
