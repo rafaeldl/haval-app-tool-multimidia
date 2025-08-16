@@ -21,6 +21,7 @@ import br.com.redesurftank.havalshisuku.listeners.IDataChanged
 import br.com.redesurftank.havalshisuku.managers.ServiceManager
 import br.com.redesurftank.havalshisuku.models.CarConstants
 import br.com.redesurftank.havalshisuku.models.SharedPreferencesKeys
+import br.com.redesurftank.havalshisuku.models.VehicleRevisions
 import java.util.concurrent.TimeUnit
 import kotlin.properties.Delegates
 
@@ -57,7 +58,8 @@ class InstrumentProjector(outerContext: Context, display: Display) : Presentatio
         if (key in listOf(
                 SharedPreferencesKeys.INSTRUMENT_REVISION_KM.key,
                 SharedPreferencesKeys.INSTRUMENT_REVISION_NEXT_DATE.key,
-                SharedPreferencesKeys.ENABLE_INSTRUMENT_REVISION_WARNING.key
+                SharedPreferencesKeys.ENABLE_INSTRUMENT_REVISION_WARNING.key,
+                SharedPreferencesKeys.CAR_MODEL.key
             )) {
             ensureUi { updateMaintenanceViewInternal() }
         }
@@ -99,7 +101,23 @@ class InstrumentProjector(outerContext: Context, display: Display) : Presentatio
             return
         }
 
-        val nextKm = preferences.getInt(SharedPreferencesKeys.INSTRUMENT_REVISION_KM.key, 12000)
+        val carModel = preferences.getString(SharedPreferencesKeys.CAR_MODEL.key, "Manual / Outro Modelo")
+        val nextKm = if (carModel == "Manual / Outro Modelo") {
+            preferences.getInt(SharedPreferencesKeys.INSTRUMENT_REVISION_KM.key, 12000)
+        } else {
+            VehicleRevisions.calculateNextRevision(carModel!!, currentKm) ?: 0
+        }
+
+        if (nextKm == 0) {
+            maintenanceTextView?.let {
+                blinkAnimator?.cancel()
+                rootLayout.removeView(it)
+                maintenanceTextView = null
+                blinkAnimator = null
+            }
+            return
+        }
+
         val remainingKm = nextKm - currentKm
 
         val nextDateMillis = preferences.getLong(SharedPreferencesKeys.INSTRUMENT_REVISION_NEXT_DATE.key, 0L)
