@@ -38,6 +38,7 @@ import br.com.redesurftank.App
 import br.com.redesurftank.havalshisuku.managers.AutoBrightnessManager
 import br.com.redesurftank.havalshisuku.models.CarConstants
 import br.com.redesurftank.havalshisuku.models.SharedPreferencesKeys
+import br.com.redesurftank.havalshisuku.models.VehicleRevisions
 import br.com.redesurftank.havalshisuku.utils.ShizukuUtils
 import br.com.redesurftank.havalshisuku.utils.FridaUtils
 import kotlinx.coroutines.Dispatchers
@@ -403,6 +404,7 @@ fun FridaHooksTab() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelasTab() {
     val context = LocalContext.current
@@ -451,33 +453,75 @@ fun TelasTab() {
             Text(SharedPreferencesKeys.ENABLE_INSTRUMENT_REVISION_WARNING.description)
         }
         if (enableWarning) {
+            val models = listOf("Haval H6", "Ora 03", "Manual / Outro Modelo")
+            var expanded by remember { mutableStateOf(false) }
+            var selectedModel by remember { mutableStateOf(prefs.getString(SharedPreferencesKeys.CAR_MODEL.key, models.first()) ?: models.first()) }
+
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Próxima KM:")
-                Row {
+                Text("Modelo do Veículo:")
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
                     TextField(
-                        value = nextKmText,
-                        onValueChange = { newValue ->
-                            if (newValue.isEmpty() || newValue.toIntOrNull() != null) {
-                                nextKmText = newValue
-                                newValue.toIntOrNull()?.let {
-                                    prefs.edit { putInt(SharedPreferencesKeys.INSTRUMENT_REVISION_KM.key, it) }
-                                }
-                            }
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
+                        value = selectedModel,
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier.menuAnchor()
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Button(onClick = {
-                        val currentKm = ServiceManager.getInstance().totalOdometer
-                        val newNextKm = currentKm + 12000
-                        nextKmText = newNextKm.toString()
-                        prefs.edit { putInt(SharedPreferencesKeys.INSTRUMENT_REVISION_KM.key, newNextKm) }
-                    }) {
-                        Text("Resetar")
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        models.forEach { model ->
+                            DropdownMenuItem(
+                                text = { Text(model) },
+                                onClick = {
+                                    selectedModel = model
+                                    prefs.edit { putString(SharedPreferencesKeys.CAR_MODEL.key, model) }
+                                    expanded = false
+                                }
+                            )
+                        }
                     }
                 }
             }
+
+            if (selectedModel == "Manual / Outro Modelo") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Próxima KM:")
+                    Row {
+                        TextField(
+                            value = nextKmText,
+                            onValueChange = { newValue ->
+                                if (newValue.isEmpty() || newValue.toIntOrNull() != null) {
+                                    nextKmText = newValue
+                                    newValue.toIntOrNull()?.let {
+                                        prefs.edit { putInt(SharedPreferencesKeys.INSTRUMENT_REVISION_KM.key, it) }
+                                    }
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Button(onClick = {
+                            val currentKm = ServiceManager.getInstance().totalOdometer
+                            val newNextKm = currentKm + 12000
+                            nextKmText = newNextKm.toString()
+                            prefs.edit { putInt(SharedPreferencesKeys.INSTRUMENT_REVISION_KM.key, newNextKm) }
+                        }) {
+                            Text("Resetar")
+                        }
+                    }
+                }
+            } else {
+                val currentKm = ServiceManager.getInstance().totalOdometer
+                val nextRevision = VehicleRevisions.calculateNextRevision(selectedModel, currentKm)
+                Text("Próxima Revisão: ${nextRevision?.toString() ?: "N/A"} km")
+            }
+
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Próxima data: $formattedNextDate")
                 Row {

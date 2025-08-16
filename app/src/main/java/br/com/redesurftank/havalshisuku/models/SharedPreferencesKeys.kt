@@ -25,5 +25,6 @@ enum class SharedPreferencesKeys(val key: String, val description: String) {
     SELF_INSTALLATION_INTEGRITY_CHECK("selfInstallationIntegrityCheck", "Verificação de integridade da instalação"),
     ADVANCE_USE("advanceUse", "Uso avançado"),
     CURRENT_USER("currentUser", "Usuário atual"),
+    CAR_MODEL("carModel", "Modelo do Veículo"),
     CAR_SETTINGS_PREFIX("carSettings_", "Configurações do carro"),
 }
