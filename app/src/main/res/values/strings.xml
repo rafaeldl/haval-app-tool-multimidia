@@ -2,4 +2,5 @@
     <string name="app_name">Haval Tool</string>
     <string name="title_activity_main">Haval Tool</string>
     <string name="title_activity_instrument_projector_kt">InstrumentProjectorKt</string>
+    <string name="open_android_settings">Abrir Configurações do Android</string>
 </resources>
