@@ -5,7 +5,9 @@ import { Chart, registerables } from 'chart.js';
 import streamingPlugin from 'chartjs-plugin-streaming';
 import 'chartjs-adapter-date-fns';
 import { WarpTunnelAnimation } from './warpTunnel.js';
-Chart.register(...registerables, streamingPlugin);
+import { circularClipPlugin, centerOverlayPlugin, sideReadoutsPlugin } from './combinedEnergyChart.js';
+
+Chart.register(...registerables, streamingPlugin, circularClipPlugin, centerOverlayPlugin, sideReadoutsPlugin);
 
 const HISTORY_DURATION = 30000; //ms
 const TIMER_HIDE_DELAY = 30000; //ms
@@ -13,6 +15,26 @@ const UI_UPDATE_INTERVAL = 100; //ms
 const ACCELERATION_THRESHOLD = 10; //s (ie 100km/h in 5s = 5, 100km/h in 10s = 10)
 
 export const graphList = [
+    {
+        id: 'combinedEnergy',
+        displayLabel: 'Energia Combinada',
+        decimalPlaces: 1,
+        isCombinedEnergy: true, // Flag para identificar o gráfico combinado
+        datasets: [
+            {
+                label: 'EV %',
+                dataKey: 'evConsumption',
+                unity: '% EV',
+                yAxisID: 'yLeft'
+            },
+            {
+                label: 'km/L',
+                dataKey: 'gasConsumption',
+                unity: 'km/L',
+                yAxisID: 'yRight'
+            }
+        ]
+    },
     {
         id: 'evConsumption',
         displayLabel: 'Consumo EV',
@@ -101,6 +123,17 @@ function startGlobalDataCollector() {
 }
 
 startGlobalDataCollector();
+
+// Métricas para o gráfico combinado de energia
+const combinedEnergyMetrics = {
+    evPctInstant: 0,
+    kmLInstant: 0,
+    kwh100Avg: 0
+};
+
+function getCombinedEnergyMetrics() {
+    return combinedEnergyMetrics;
+}
 
 const graphController = {
 
@@ -239,6 +272,35 @@ const graphController = {
                 plugins: {
                     legend: { display: false },
                     tooltip: { enabled: false },
+                    // Plugins do gráfico combinado (desabilitados por padrão)
+                    circularClip: {
+                        enabled: false,
+                        ringWidth: 3,
+                        ringColor: '#1d4ed8',
+                        glowColor: 'rgba(29, 78, 216, 0.7)',
+                        glowBlur: 15
+                    },
+                    centerOverlay: {
+                        enabled: false,
+                        getMetricsFn: getCombinedEnergyMetrics,
+                        valueFontSize: 72,
+                        labelFontSize: 20,
+                        fontFamily: "'Khand', system-ui, sans-serif",
+                        textColor: '#ffffff',
+                        shadowColor: 'rgba(0, 0, 0, 0.5)',
+                        shadowBlur: 4
+                    },
+                    sideReadouts: {
+                        enabled: false,
+                        getMetricsFn: getCombinedEnergyMetrics,
+                        valueFontSize: 32,
+                        labelFontSize: 14,
+                        fontFamily: "'Khand', system-ui, sans-serif",
+                        evColor: '#00c3ff',
+                        kmLColor: '#9affb5',
+                        horizontalOffset: 95,
+                        verticalOffset: 0
+                    }
                 },
                 scales: {
                     x: {
@@ -282,6 +344,23 @@ const graphController = {
                         grid: {
                             drawOnChartArea: false,
                         }
+                    },
+                    // Escalas para o gráfico combinado
+                    yLeft: {
+                        type: 'linear',
+                        position: 'left',
+                        display: false,
+                        min: -50,
+                        max: 50,
+                        grid: { display: false }
+                    },
+                    yRight: {
+                        type: 'linear',
+                        position: 'right',
+                        display: false,
+                        min: 0,
+                        max: 40,
+                        grid: { display: false }
                     }
                 }
             }
@@ -301,6 +380,32 @@ const graphController = {
                 const speedTimerTooltip = document.getElementById('timer-tooltip');
                 const speedTimerValue = document.getElementById('timer-tooltip-value');
                 const LINE_OFFSET = 13;
+
+                // Verificar se é o gráfico combinado de energia
+                if (graphInfo.isCombinedEnergy) {
+                    // Atualizar métricas para os plugins de overlay
+                    combinedEnergyMetrics.evPctInstant = getState('evConsumption') || 0;
+                    combinedEnergyMetrics.kmLInstant = getState('gasConsumption') || 0;
+
+                    // kwh100Avg pode vir do estado ou ser calculado
+                    const kwh100Avg = getState('kwh100Avg');
+                    if (kwh100Avg !== undefined) {
+                        combinedEnergyMetrics.kwh100Avg = kwh100Avg;
+                    }
+
+                    // Esconder tooltips HTML (plugins desenham no canvas)
+                    if (primaryTooltipEl) primaryTooltipEl.style.display = 'none';
+                    if (secondaryTooltipEl) secondaryTooltipEl.style.display = 'none';
+                    if (primaryLineEl) primaryLineEl.style.display = 'none';
+                    if (secondaryLineEl) secondaryLineEl.style.display = 'none';
+
+                    // Garantir que warp e timer estão escondidos
+                    this.setWarpAnimation(false);
+                    this.setChronometer('stop');
+
+                    this.chartInstance.update('quiet');
+                    return;
+                }
 
                 if (primaryTooltipEl) primaryTooltipEl.style.opacity = 0;
                 if (primaryLineEl) primaryLineEl.style.opacity = 0;
@@ -458,26 +563,79 @@ const graphController = {
         if (!graphInfo) return;
 
         const scales = this.chartInstance.options.scales;
-        const hasSecondaryAxis = graphInfo.datasets[1] && graphInfo.datasets[1].dataKey;
+        const plugins = this.chartInstance.options.plugins;
+        const isCombinedEnergy = graphInfo.isCombinedEnergy === true;
+
+        // Habilitar/desabilitar plugins do gráfico combinado
+        plugins.circularClip.enabled = isCombinedEnergy;
+        plugins.centerOverlay.enabled = isCombinedEnergy;
+        plugins.sideReadouts.enabled = isCombinedEnergy;
+
+        // Esconder tooltips HTML quando gráfico combinado estiver ativo
+        const primaryTooltipEl = document.querySelector('.dynamic-tooltip.primary');
+        const secondaryTooltipEl = document.querySelector('.dynamic-tooltip.secondary');
+        const primaryLineEl = document.querySelector('.dynamic-tooltip-line.primary');
+        const secondaryLineEl = document.querySelector('.dynamic-tooltip-line.secondary');
+
+        if (isCombinedEnergy) {
+            // Esconder elementos HTML - os plugins desenham no canvas
+            if (primaryTooltipEl) primaryTooltipEl.style.display = 'none';
+            if (secondaryTooltipEl) secondaryTooltipEl.style.display = 'none';
+            if (primaryLineEl) primaryLineEl.style.display = 'none';
+            if (secondaryLineEl) secondaryLineEl.style.display = 'none';
+
+            // Configurar escalas para o gráfico combinado
+            scales.y.display = false;
+            scales.y1.display = false;
+            scales.yLeft.display = false;
+            scales.yRight.display = false;
+
+            // Ajustar layout para o gráfico combinado (mais padding para os overlays)
+            this.chartInstance.options.layout.padding = { top: 60, bottom: 60, left: 60, right: 60 };
+        } else {
+            // Restaurar elementos HTML
+            if (primaryTooltipEl) primaryTooltipEl.style.display = 'flex';
+            if (secondaryTooltipEl) secondaryTooltipEl.style.display = 'flex';
+            if (primaryLineEl) primaryLineEl.style.display = 'block';
+            if (secondaryLineEl) secondaryLineEl.style.display = 'block';
+
+            // Restaurar layout padrão
+            this.chartInstance.options.layout.padding = { top: 0, bottom: 0, left: 0, right: 0 };
+        }
+
+        const hasSecondaryAxis = !isCombinedEnergy && graphInfo.datasets[1] && graphInfo.datasets[1].dataKey;
         scales.y1.display = hasSecondaryAxis;
 
         const bulletContainer = document.querySelector('.graph-bullet-container');
         const tooltipLines = document.querySelectorAll('.dynamic-tooltip-line');
         if (bulletContainer && tooltipLines.length > 0) {
-            if (hasSecondaryAxis) {
+            if (isCombinedEnergy) {
+                bulletContainer.classList.add('position-right');
+                bulletContainer.classList.remove('position-left');
+                tooltipLines.forEach(line => line.style.display = 'none');
+            } else if (hasSecondaryAxis) {
                 bulletContainer.classList.add('position-left');
                 bulletContainer.classList.remove('position-right');
-                tooltipLines.forEach(line => line.style.width = '80%');
-
+                tooltipLines.forEach(line => {
+                    line.style.display = 'block';
+                    line.style.width = '80%';
+                });
             } else {
                 bulletContainer.classList.add('position-right');
                 bulletContainer.classList.remove('position-left');
-                tooltipLines.forEach(line => line.style.width = '95%');
+                tooltipLines.forEach(line => {
+                    line.style.display = 'block';
+                    line.style.width = '95%';
+                });
             }
         }
 
-
-        if (graphId === 'gasConsumption') {
+        if (graphId === 'combinedEnergy') {
+            // Configurar escalas do gráfico combinado
+            scales.y.display = false;
+            scales.y1.display = false;
+        } else if (graphId === 'gasConsumption') {
+            scales.y.display = true;
             scales.y.min = -15;
             scales.y.max = 45;
             scales.y.ticks.stepSize = 10;
@@ -487,6 +645,7 @@ const graphController = {
             scales.y1.ticks.stepSize = 3;
             scales.y1.ticks.color = this.colors.secondary + 'B3';
         } else if (graphId === 'carSpeed') {
+            scales.y.display = true;
             scales.y.min = -50;
             scales.y.max = 200;
             scales.y.ticks.stepSize = 40;
@@ -495,6 +654,7 @@ const graphController = {
             scales.y1.ticks.stepSize = 10;
             scales.y1.ticks.color = this.colors.secondary + 'B3';
         } else if (graphId === 'evConsumption') {
+            scales.y.display = true;
             scales.y.min = -125;
             scales.y.max = 115;
             scales.y.ticks.stepSize = 25;

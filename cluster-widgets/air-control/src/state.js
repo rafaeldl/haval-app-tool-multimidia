@@ -87,14 +87,15 @@ var stateManager = new StateManager({
     onepedal: false,
 
     // Graph values
-    currentGraph: 'evConsumption',
+    currentGraph: 'combinedEnergy',
     evConsumption: 0,
     gasConsumption: 0.0,
     gasConsumptionMetric: 'Km/l',
     gasConsumptionIdle: 0.0,
     gasConsumptionMetricIdle: 'L/hora',
     gasConsumptionMode: 'Running',
-    carSpeed: 0
+    carSpeed: 0,
+    kwh100Avg: 15.0
 });
 
 // Convenience functions for easier usage

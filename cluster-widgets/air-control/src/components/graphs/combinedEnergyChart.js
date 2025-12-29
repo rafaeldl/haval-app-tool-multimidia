@@ -26,6 +26,8 @@ const circularClipPlugin = {
     id: 'circularClip',
 
     beforeDatasetsDraw(chart, args, options) {
+        if (options.enabled === false) return;
+
         const { ctx, chartArea } = chart;
         const { left, top, width, height } = chartArea;
 
@@ -44,11 +46,14 @@ const circularClipPlugin = {
     },
 
     afterDatasetsDraw(chart, args, options) {
+        if (options.enabled === false) return;
         const { ctx } = chart;
         ctx.restore();
     },
 
     afterDraw(chart, args, options) {
+        if (options.enabled === false) return;
+
         const { ctx, width, height } = chart;
 
         const centerX = width / 2;
@@ -86,6 +91,8 @@ const centerOverlayPlugin = {
     id: 'centerOverlay',
 
     afterDraw(chart, args, options) {
+        if (options.enabled === false) return;
+
         const { ctx, width, height } = chart;
         const getMetrics = options.getMetricsFn;
 
@@ -139,6 +146,8 @@ const sideReadoutsPlugin = {
     id: 'sideReadouts',
 
     afterDraw(chart, args, options) {
+        if (options.enabled === false) return;
+
         const { ctx, width, height } = chart;
         const getMetrics = options.getMetricsFn;
 
