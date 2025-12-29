@@ -1264,3 +1264,119 @@ canvas.graph-chart {
 .screen-flash-animation {
   animation: screen-flash 0.5s ease-in-out;
 }
+
+
+/* ============================================= */
+/*          HYBRID CONSUMPTION DASHBOARD         */
+/* ============================================= */
+
+.hybrid-center-kpi {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 12;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease-in-out;
+}
+
+.hybrid-center-kpi.visible {
+  opacity: 1;
+}
+
+.hybrid-kpi-value {
+  font-family: 'Khand', sans-serif;
+  font-size: 72px;
+  font-weight: 500;
+  color: #ffffff;
+  text-shadow: 0 0 15px rgba(0, 195, 255, 0.6);
+  line-height: 1;
+}
+
+.hybrid-kpi-unity {
+  font-family: 'Khand', sans-serif;
+  font-size: 22px;
+  font-weight: 100;
+  color: #c2e3ffcc;
+  margin-top: -5px;
+}
+
+.hybrid-side-value {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 12;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease-in-out;
+}
+
+.hybrid-side-value.visible {
+  opacity: 1;
+}
+
+.hybrid-side-value.left {
+  left: 45px;
+  align-items: flex-start;
+}
+
+.hybrid-side-value.right {
+  right: 45px;
+  align-items: flex-end;
+}
+
+.hybrid-side-number {
+  font-family: 'Khand', sans-serif;
+  font-size: 36px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.hybrid-side-value.left .hybrid-side-number {
+  color: #00c3ff;
+}
+
+.hybrid-side-value.right .hybrid-side-number {
+  color: #9affb5;
+}
+
+.hybrid-side-value.left .hybrid-side-number.negative {
+  color: #ff6b6b;
+}
+
+.hybrid-side-unity {
+  font-family: 'Khand', sans-serif;
+  font-size: 14px;
+  font-weight: 100;
+  color: #c2e3ffaa;
+  margin-top: 2px;
+}
+
+.hybrid-avg-label {
+  position: absolute;
+  bottom: 85px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Khand', sans-serif;
+  font-size: 16px;
+  font-weight: 100;
+  color: #4d97ff;
+  white-space: nowrap;
+  z-index: 12;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease-in-out;
+}
+
+.hybrid-avg-label.visible {
+  opacity: 1;
+}

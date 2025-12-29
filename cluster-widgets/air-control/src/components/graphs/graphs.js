@@ -14,6 +14,31 @@ const ACCELERATION_THRESHOLD = 10; //s (ie 100km/h in 5s = 5, 100km/h in 10s = 1
 
 export const graphList = [
     {
+        id: 'hybridConsumption',
+        displayLabel: 'Consumo Híbrido',
+        decimalPlaces: 1,
+        datasets: [
+            {
+                label: 'Consumo Híbrido',
+                dataKey: 'kWhPer100km',
+                unity: 'kWh/100km',
+                yAxisID: 'y'
+            },
+            {
+                label: '% EV',
+                dataKey: 'evConsumption',
+                unity: '% de Energia',
+                yAxisID: 'y1'
+            },
+            {
+                label: 'Combustível',
+                dataKey: 'gasConsumption',
+                unity: 'km/L',
+                yAxisID: 'y2'
+            }
+        ]
+    },
+    {
         id: 'evConsumption',
         displayLabel: 'Consumo EV',
         decimalPlaces: 0,
@@ -403,6 +428,53 @@ const graphController = {
 
                     this.lastCarSpeed = currentSpeed;
 
+                } else if (graphInfo.id === 'hybridConsumption') {
+                    // Hybrid consumption dashboard
+                    this.setWarpAnimation(false);
+                    this.setChronometer('stop');
+
+                    const hybridKpiValueEl = document.getElementById('hybrid-kpi-value');
+                    const hybridLeftNumberEl = document.getElementById('hybrid-left-number');
+                    const hybridRightNumberEl = document.getElementById('hybrid-right-number');
+
+                    // Calculate average kWh/100km from historical data
+                    const kWhData = historicalData['kWhPer100km'] || [];
+                    let avgKwh = 0;
+                    if (kWhData.length > 0) {
+                        const sum = kWhData.reduce((acc, point) => acc + point.y, 0);
+                        avgKwh = sum / kWhData.length;
+                    } else {
+                        avgKwh = getState('kWhPer100km') || 0;
+                    }
+
+                    // Get instantaneous values for side displays
+                    const evPercent = getState('evConsumption') || 0;
+                    const gasConsumption = getState('gasConsumption') || 0;
+
+                    // Update center KPI (average kWh/100km)
+                    if (hybridKpiValueEl) {
+                        hybridKpiValueEl.textContent = avgKwh.toFixed(1);
+                    }
+
+                    // Update left side (EV %)
+                    // Negative value indicates regeneration
+                    if (hybridLeftNumberEl) {
+                        const evValue = evPercent;
+                        const isNegative = evValue < 0;
+                        hybridLeftNumberEl.textContent = (isNegative ? '' : '') + Math.abs(evValue).toFixed(0);
+                        if (isNegative) {
+                            hybridLeftNumberEl.classList.add('negative');
+                            hybridLeftNumberEl.textContent = '-' + Math.abs(evValue).toFixed(0);
+                        } else {
+                            hybridLeftNumberEl.classList.remove('negative');
+                        }
+                    }
+
+                    // Update right side (km/L)
+                    if (hybridRightNumberEl) {
+                        hybridRightNumberEl.textContent = gasConsumption.toFixed(1);
+                    }
+
                 } else {  // Other graphs
                     let activeValue, activeUnity, activeDatasetIndex;
 
@@ -463,16 +535,45 @@ const graphController = {
 
         const bulletContainer = document.querySelector('.graph-bullet-container');
         const tooltipLines = document.querySelectorAll('.dynamic-tooltip-line');
-        if (bulletContainer && tooltipLines.length > 0) {
-            if (hasSecondaryAxis) {
-                bulletContainer.classList.add('position-left');
-                bulletContainer.classList.remove('position-right');
-                tooltipLines.forEach(line => line.style.width = '80%');
 
-            } else {
+        // Hybrid dashboard elements visibility
+        const hybridCenterKpi = document.getElementById('hybrid-center-kpi');
+        const hybridLeftValue = document.getElementById('hybrid-left-value');
+        const hybridRightValue = document.getElementById('hybrid-right-value');
+        const hybridAvgLabel = document.getElementById('hybrid-avg-label');
+
+        if (graphId === 'hybridConsumption') {
+            // Show hybrid elements
+            if (hybridCenterKpi) hybridCenterKpi.classList.add('visible');
+            if (hybridLeftValue) hybridLeftValue.classList.add('visible');
+            if (hybridRightValue) hybridRightValue.classList.add('visible');
+            if (hybridAvgLabel) hybridAvgLabel.classList.add('visible');
+            // Position bullets to the right for hybrid
+            if (bulletContainer) {
                 bulletContainer.classList.add('position-right');
                 bulletContainer.classList.remove('position-left');
-                tooltipLines.forEach(line => line.style.width = '95%');
+            }
+            if (tooltipLines.length > 0) {
+                tooltipLines.forEach(line => line.style.display = 'none');
+            }
+        } else {
+            // Hide hybrid elements for other graphs
+            if (hybridCenterKpi) hybridCenterKpi.classList.remove('visible');
+            if (hybridLeftValue) hybridLeftValue.classList.remove('visible');
+            if (hybridRightValue) hybridRightValue.classList.remove('visible');
+            if (hybridAvgLabel) hybridAvgLabel.classList.remove('visible');
+
+            if (bulletContainer && tooltipLines.length > 0) {
+                tooltipLines.forEach(line => line.style.display = 'block');
+                if (hasSecondaryAxis) {
+                    bulletContainer.classList.add('position-left');
+                    bulletContainer.classList.remove('position-right');
+                    tooltipLines.forEach(line => line.style.width = '80%');
+                } else {
+                    bulletContainer.classList.add('position-right');
+                    bulletContainer.classList.remove('position-left');
+                    tooltipLines.forEach(line => line.style.width = '95%');
+                }
             }
         }
 
@@ -498,26 +599,52 @@ const graphController = {
             scales.y.min = -125;
             scales.y.max = 115;
             scales.y.ticks.stepSize = 25;
+        } else if (graphId === 'hybridConsumption') {
+            // Main axis: kWh/100km (for the background graph)
+            scales.y.min = 0;
+            scales.y.max = 30;
+            scales.y.ticks.stepSize = 5;
+            scales.y.ticks.color = this.colors.primary + 'B3';
+            // Hide secondary axes for hybrid - we show values in custom elements
+            scales.y1.display = false;
         }
 
         const newDatasets = [];
         const datasetColors = [this.colors.primary, this.colors.secondary];
 
-        graphInfo.datasets.forEach((datasetInfo, index) => {
-            if (datasetInfo.dataKey) {
+        if (graphId === 'hybridConsumption') {
+            // For hybrid, only show the kWh/100km dataset in the background chart
+            const mainDataset = graphInfo.datasets[0];
+            if (mainDataset.dataKey) {
                 newDatasets.push({
-                    label: datasetInfo.label,
-                    data: historicalData[datasetInfo.dataKey] || [],
-                    yAxisID: datasetInfo.yAxisID,
-                    borderColor: datasetColors[index],
-                    backgroundColor: index === 0 ? this.colors.primary + '26' : this.colors.secondary + '1A',
+                    label: mainDataset.label,
+                    data: historicalData[mainDataset.dataKey] || [],
+                    yAxisID: mainDataset.yAxisID,
+                    borderColor: this.colors.primary,
+                    backgroundColor: this.colors.primary + '26',
                     borderWidth: 2,
                     pointRadius: 0,
                     fill: true,
                     tension: 0.3,
                 });
             }
-        });
+        } else {
+            graphInfo.datasets.forEach((datasetInfo, index) => {
+                if (datasetInfo.dataKey) {
+                    newDatasets.push({
+                        label: datasetInfo.label,
+                        data: historicalData[datasetInfo.dataKey] || [],
+                        yAxisID: datasetInfo.yAxisID,
+                        borderColor: datasetColors[index],
+                        backgroundColor: index === 0 ? this.colors.primary + '26' : this.colors.secondary + '1A',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true,
+                        tension: 0.3,
+                    });
+                }
+            });
+        }
 
         this.chartInstance.data.datasets = newDatasets;
 
@@ -594,6 +721,38 @@ export function createGraphScreen() {
     timerTooltipUnity.textContent = '0 - 100 km/h';
 
     innerRing.appendChild(timerTooltip);
+
+    // Hybrid consumption dashboard elements
+    const hybridCenterKpi = div({ className: 'hybrid-center-kpi', id: 'hybrid-center-kpi' });
+    const hybridKpiValue = span({ className: 'hybrid-kpi-value', id: 'hybrid-kpi-value' });
+    const hybridKpiUnity = span({ className: 'hybrid-kpi-unity' });
+    hybridKpiValue.textContent = '0.0';
+    hybridKpiUnity.textContent = 'kWh/100km';
+    hybridCenterKpi.appendChild(hybridKpiValue);
+    hybridCenterKpi.appendChild(hybridKpiUnity);
+    innerRing.appendChild(hybridCenterKpi);
+
+    const hybridLeftValue = div({ className: 'hybrid-side-value left', id: 'hybrid-left-value' });
+    const hybridLeftNumber = span({ className: 'hybrid-side-number', id: 'hybrid-left-number' });
+    const hybridLeftUnity = span({ className: 'hybrid-side-unity' });
+    hybridLeftNumber.textContent = '0';
+    hybridLeftUnity.textContent = '% de Energia';
+    hybridLeftValue.appendChild(hybridLeftNumber);
+    hybridLeftValue.appendChild(hybridLeftUnity);
+    innerRing.appendChild(hybridLeftValue);
+
+    const hybridRightValue = div({ className: 'hybrid-side-value right', id: 'hybrid-right-value' });
+    const hybridRightNumber = span({ className: 'hybrid-side-number', id: 'hybrid-right-number' });
+    const hybridRightUnity = span({ className: 'hybrid-side-unity' });
+    hybridRightNumber.textContent = '0.0';
+    hybridRightUnity.textContent = 'km/L';
+    hybridRightValue.appendChild(hybridRightNumber);
+    hybridRightValue.appendChild(hybridRightUnity);
+    innerRing.appendChild(hybridRightValue);
+
+    const hybridAvgLabel = div({ className: 'hybrid-avg-label', id: 'hybrid-avg-label' });
+    hybridAvgLabel.textContent = 'Média 30s';
+    innerRing.appendChild(hybridAvgLabel);
 
 
 

@@ -87,14 +87,18 @@ var stateManager = new StateManager({
     onepedal: false,
 
     // Graph values
-    currentGraph: 'evConsumption',
+    currentGraph: 'hybridConsumption',
     evConsumption: 0,
     gasConsumption: 0.0,
     gasConsumptionMetric: 'Km/l',
     gasConsumptionIdle: 0.0,
     gasConsumptionMetricIdle: 'L/hora',
     gasConsumptionMode: 'Running',
-    carSpeed: 0
+    carSpeed: 0,
+
+    // Hybrid consumption values
+    kWhPer100km: 0.0,
+    hybridEvPercent: 0
 });
 
 // Convenience functions for easier usage
