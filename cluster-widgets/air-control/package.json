@@ -10,7 +10,7 @@
     "build:night": "parcel build app-night.html --dist-dir dist --public-url ./ && node inline.js",
     "build:light": "parcel build app-light.html --dist-dir dist --public-url ./ && node inline.js",
     "build": "bun run clear && bun run build:night && bun run build:light",
-    "prerelease": "bun run build && cp dist/app-night.html ../app/src/main/res/raw/app-night.html && cp dist/app-light.html ../app/src/main/res/raw/app-light.html"
+    "prerelease": "bun run build && cp dist/app-night.html ../app/src/main/res/raw/app_night.html && cp dist/app-light.html ../app/src/main/res/raw/app_light.html"
   },
   "devDependencies": {
     "bun": "^1.3.0",
