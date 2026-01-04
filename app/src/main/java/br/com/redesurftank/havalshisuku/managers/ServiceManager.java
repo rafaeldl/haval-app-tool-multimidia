@@ -884,6 +884,9 @@ public class ServiceManager {
     }
 
     private void OnDataChanged(String key, String value) {
+        // Log telemetry
+        LogManager.getInstance().log(key, value);
+
         Intent broadcastIntent = new Intent("android.intent.haval." + key);
         broadcastIntent.putExtra("value", value);
         App.getContext().sendBroadcast(broadcastIntent);

@@ -73,6 +73,8 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -171,7 +173,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
     val menuItems = buildList {
         add(DrawerMenuItem("Configurações", Icons.Default.Settings))
         add(DrawerMenuItem("Telas", Icons.Default.SmartDisplay))
-        add(DrawerMenuItem("Valores Atuais", Icons.Default.DeveloperMode))
+        add(DrawerMenuItem("Telemetria", Icons.Default.DeveloperMode))
         add(DrawerMenuItem("Instalar Apps", Icons.Default.ShoppingCart))
         add(DrawerMenuItem("Informações", Icons.Default.Info))
         if (advancedUse) {
@@ -1213,6 +1215,7 @@ fun TelasTab() {
 
 @Composable
 fun CurrentValuesTab() {
+    val context = LocalContext.current
     val prefs = App.getDeviceProtectedContext().getSharedPreferences("haval_prefs", Context.MODE_PRIVATE)
     val advancedUse = prefs.getBoolean(SharedPreferencesKeys.ADVANCE_USE.key, false)
     val dataMap = remember {
@@ -1220,6 +1223,11 @@ fun CurrentValuesTab() {
             putAll(ServiceManager.getInstance().allCurrentCachedData)
         }
     }
+
+    // Telemetry States
+    var enableTelemetry by remember { mutableStateOf(prefs.getBoolean(SharedPreferencesKeys.ENABLE_TELEMETRY.key, false)) }
+    var showTelemetrySettings by remember { mutableStateOf(false) }
+
     var showConfigDialog by remember { mutableStateOf(false) }
     val allConstants = remember { CarConstants.entries.map { it.value } }
     val defaultKeys = remember { ServiceManager.DEFAULT_KEYS.map { it.value } } // Assuming DEFAULT_KEYS is Array<CarConstants>
@@ -1249,6 +1257,56 @@ fun CurrentValuesTab() {
             .fillMaxSize()
             .padding(12.dp)
     ) {
+        // Telemetry Control Panel
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF13151A))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            "Telemetria",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            if (enableTelemetry) "Monitoramento Ativo" else "Monitoramento Pausado",
+                            fontSize = 14.sp,
+                            color = if (enableTelemetry) Color(0xFF4ADE80) else Color(0xFFB0B8C4)
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(
+                            checked = enableTelemetry,
+                            onCheckedChange = {
+                                enableTelemetry = it
+                                prefs.edit { putBoolean(SharedPreferencesKeys.ENABLE_TELEMETRY.key, it) }
+                                br.com.redesurftank.havalshisuku.managers.LogManager.getInstance().updatePreferences()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = AppColors.Primary
+                            )
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Button(
+                            onClick = { showTelemetrySettings = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2F37))
+                        ) {
+                            Icon(Icons.Default.Settings, "Configurações", tint = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+
         if (advancedUse) {
             Button(
                 onClick = { showConfigDialog = true },
@@ -1256,7 +1314,7 @@ fun CurrentValuesTab() {
                     containerColor = Color(0xFF4A9EFF)
                 )
             ) {
-                Text("Configurar", color = Color.White)
+                Text("Configurar Parâmetros", color = Color.White)
             }
             Spacer(Modifier.height(8.dp))
         }
@@ -1310,6 +1368,81 @@ fun CurrentValuesTab() {
             }
         }
     }
+
+    if (showTelemetrySettings) {
+        var webhookUrl by remember { mutableStateOf(prefs.getString(SharedPreferencesKeys.TELEMETRY_WEBHOOK_URL.key, "") ?: "") }
+        var logToFile by remember { mutableStateOf(prefs.getBoolean(SharedPreferencesKeys.TELEMETRY_LOG_TO_FILE.key, false)) }
+        var sendToCloud by remember { mutableStateOf(prefs.getBoolean(SharedPreferencesKeys.TELEMETRY_SEND_TO_CLOUD.key, false)) }
+
+        AlertDialog(
+            onDismissRequest = { showTelemetrySettings = false },
+            title = { Text("Configurações de Telemetria") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    SettingItem(
+                        title = "Salvar em Arquivo Local",
+                        description = "Gravar logs em: Android/data/.../telemetry/",
+                        checked = logToFile,
+                        onCheckedChange = { logToFile = it }
+                    )
+
+                    SettingItem(
+                        title = "Enviar para Nuvem",
+                        description = "Enviar logs para Webhook configurado",
+                        checked = sendToCloud,
+                        onCheckedChange = { sendToCloud = it }
+                    )
+
+                    if (sendToCloud) {
+                        TextField(
+                            value = webhookUrl,
+                            onValueChange = { webhookUrl = it },
+                            label = { Text("Webhook URL") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            val sessionId = br.com.redesurftank.havalshisuku.managers.LogManager.getInstance().getSessionId()
+                            val file = File(context.getExternalFilesDir(null), "telemetry/session_$sessionId.jsonl")
+                            if (file.exists()) {
+                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "application/json"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Compartilhar Log"))
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2F37))
+                    ) {
+                        Text("Compartilhar Log da Sessão Atual", color = Color.White)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    prefs.edit {
+                        putString(SharedPreferencesKeys.TELEMETRY_WEBHOOK_URL.key, webhookUrl)
+                        putBoolean(SharedPreferencesKeys.TELEMETRY_LOG_TO_FILE.key, logToFile)
+                        putBoolean(SharedPreferencesKeys.TELEMETRY_SEND_TO_CLOUD.key, sendToCloud)
+                    }
+                    br.com.redesurftank.havalshisuku.managers.LogManager.getInstance().updatePreferences()
+                    showTelemetrySettings = false
+                }) {
+                    Text("Salvar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTelemetrySettings = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     if (showConfigDialog && advancedUse) {
         AlertDialog(
             onDismissRequest = { showConfigDialog = false },
