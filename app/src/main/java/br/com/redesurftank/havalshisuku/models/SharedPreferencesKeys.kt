@@ -53,6 +53,11 @@ enum class SharedPreferencesKeys(val key: String, val description: String) {
     ENABLE_MAX_AC_ON_UNLOCK("enableMaxAcOnUnlock", "Habilitar A/C no máximo ao ligar o veículo se temperatura acima do configurado"),
     MAX_AC_ON_UNLOCK_THRESHOLD("maxAcOnUnlockThreshold", "Temperatura limite para ativar Max AC ao destravar"),
     MAX_AC_TARGET_TEMP("maxAcTargetTemp", "Temperatura alvo para o Max AC"),
-    MAX_AC_TIMEOUT("maxAcTimeout", "Tempo limite para desativar o Max AC (em minutos)")
+    MAX_AC_TIMEOUT("maxAcTimeout", "Tempo limite para desativar o Max AC (em minutos)"),
 
+    // Telemetry
+    ENABLE_TELEMETRY("enableTelemetry", "Habilitar telemetria"),
+    TELEMETRY_WEBHOOK_URL("telemetryWebhookUrl", "URL do Webhook para envio de dados"),
+    TELEMETRY_LOG_TO_FILE("telemetryLogToFile", "Salvar logs em arquivo local"),
+    TELEMETRY_SEND_TO_CLOUD("telemetrySendToCloud", "Enviar logs para a nuvem")
 }
